@@ -121,6 +121,60 @@ class DetectedObjectsIU(retico_core.IncrementalUnit):
         self.payload = self.detected_objects
         self.num_objects = json_dict['num_objects']
 
+class ObjectFeaturesIU(retico_core.IncrementalUnit):
+    """An image incremental unit that maintains a list of feature vectors for detected objects in a scene.
+
+    Attributes:
+        creator (AbstractModule): The module that created this IU
+        previous_iu (IncrementalUnit): A link to the IU created before the
+            current one.
+        grounded_in (IncrementalUnit): A link to the IU this IU is based on.
+        created_at (float): The UNIX timestamp of the moment the IU is created.
+    """
+
+    @staticmethod
+    def type():
+        return "Object Features IU"
+
+    def __init__(
+        self,
+        creator=None,
+        iuid=0,
+        previous_iu=None,
+        grounded_in=None,
+        **kwargs
+    ):
+        super().__init__(
+            creator=creator,
+            iuid=iuid,
+            previous_iu=previous_iu,
+            grounded_in=grounded_in,
+            payload=None
+        )
+        self.object_features = None
+        self.num_objects = 0
+        self.image = None
+
+    def set_object_features(self, image, object_features):
+        """Sets the content of the IU."""
+        self.image = image
+        self.payload = object_features
+        self.object_features = object_features
+        self.num_objects = len(object_features)
+
+    def get_json(self):
+        payload = {}
+        payload['image'] = np.array(self.image).tolist()
+        payload['object_features'] = self.object_features
+        payload['num_objects'] = self.num_objects
+        return payload
+
+    def create_from_json(self, json_dict):
+        self.image =  Image.fromarray(np.array(json_dict['image'], dtype='uint8'))
+        self.object_features = json_dict['object_features']
+        self.payload = json_dict['object_features']
+        self.num_objects = json_dict['num_objects']
+
 class WebcamModule(retico_core.AbstractProducingModule):
     """A module that produces IUs containing images that are captures by
     a web camera."""
