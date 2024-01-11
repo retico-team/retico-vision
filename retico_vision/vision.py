@@ -104,9 +104,9 @@ class DetectedObjectsIU(retico_core.IncrementalUnit):
     def set_detected_objects(self, image, detected_objects):
         """Sets the content for the IU"""
         self.image = image
-        self.payload = detected_objects
+        self.payload = {0: detected_objects}
         self.detected_objects = detected_objects
-        self.num_objects = len(detected_objects)
+        self.payload['num_objects'] = len(detected_objects)
 
     def get_json(self):
         payload = {}
@@ -239,6 +239,57 @@ class WebcamModule(retico_core.AbstractProducingModule):
 
     def shutdown(self):
         """Close the video stream."""
-        self.cap.release()        
+        self.cap.release()    
+        
+    
+class ImageCropperModule(retico_core.AbstractModule):
+    """A module that crops images"""
 
+    @staticmethod
+    def name():
+        return "Image Cropper Module"
+
+    @staticmethod
+    def description():
+        return "A module that crops images"
+
+
+    @staticmethod
+    def input_ius():
+        return [ImageIU]
+
+    @staticmethod
+    def output_iu():
+        return ImageIU
+
+    def __init__(self, top=-1, bottom=-1, left=-1, right=-1, **kwargs):
+        """
+        Initialize the Webcam Module.
+        Args:
+            width (int): Width of the image captured by the webcam; will use camera default if unset
+            height (int): Height of the image captured by the webcam; will use camera default if unset
+            rate (int): The frame rate of the recording; will use camera default if unset
+        """
+        super().__init__(**kwargs)
+        self.top =  top
+        self.bottom = bottom
+        self.left = left
+        self.right = right
+
+    def process_update(self, update_message):
+        for iu, ut in update_message:
+            if ut != retico_core.UpdateType.ADD:
+                continue
+            image = iu.image
+            width, height = image.size
+            left = self.left if self.left != -1 else 0
+            top = self.top if self.top != -1 else 0
+            right = self.right if self.right != -1 else width
+            bottom = self.bottom if self.bottom != -1 else height
+            image = image.crop((left, top, right, bottom)) 
+            output_iu = self.create_iu(iu)
+            output_iu.set_image(image, iu.nframes, iu.rate)
+            return retico_core.UpdateMessage.from_iu(output_iu, retico_core.UpdateType.ADD)
+        
+        return None
 
