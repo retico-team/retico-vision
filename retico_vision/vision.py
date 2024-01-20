@@ -2,6 +2,11 @@
 import cv2
 import numpy as np
 from PIL import Image
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import math
+import os
 
 import retico_core
 
@@ -100,19 +105,22 @@ class DetectedObjectsIU(retico_core.IncrementalUnit):
         self.image = None
         self.detected_objects = None
         self.num_objects = 0
+        self.object_type = None
 
-    def set_detected_objects(self, image, detected_objects):
+    def set_detected_objects(self, image, detected_objects, object_type):
         """Sets the content for the IU"""
         self.image = image
-        self.payload = {0: detected_objects}
+        self.payload = detected_objects
         self.detected_objects = detected_objects
-        self.payload['num_objects'] = len(detected_objects)
+        self.num_objects = len(detected_objects)
+        self.object_type = object_type
 
     def get_json(self):
         payload = {}
-        payload['image'] = np.array(self.payload).tolist()
+        payload['image'] = np.array(self.payload).tolist() #just sets image to be the list of objects 
         payload['detected_objects'] = self.detected_objects
         payload['num_objects'] = self.num_objects
+        payload['object_type'] = self.object_type
         return payload
 
     def create_from_json(self, json_dict):
@@ -339,7 +347,7 @@ class ExtractObjectsModule(retico_core.AbstractModule):
 
                 obj_type = img_dict['object_type']
                 num_objs = img_dict['num_objects']
-                print(f"Num Objects in Vsison: {num_objs}")
+                # print(f"Num Objects in Vsison: {num_objs}")
 
                 if (self.num_obj_to_display > num_objs):
                     print("Number of objects detected less than requested. Showing all objects.")
