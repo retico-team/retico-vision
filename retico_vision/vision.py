@@ -292,4 +292,190 @@ class ImageCropperModule(retico_core.AbstractModule):
             return retico_core.UpdateMessage.from_iu(output_iu, retico_core.UpdateType.ADD)
         
         return None
+        
+        
+class ExtractObjectsModule(retico_core.AbstractModule):
+    """A module that produces image IUs containing detected objects segmented 
+    by SAM or Yolo."""
+
+    @staticmethod
+    def name():
+        return "Extract Object Module"
+
+    @staticmethod
+    def description():
+        return "A module that produces iamges of individual objects from segmentations produced by SAM or Yolo."
+
+    @staticmethod
+    def input_ius():
+        return [DetectedObjectsIU]
+    
+    @staticmethod
+    def output_iu():
+        return ExtractedObjectsIU
+
+    def __init__(self, num_obj_to_display=1, **kwargs):
+        """
+        Initialize the Display Objects Module
+        Args:
+            object_type (str): whether object is defined 
+                in bounding box or segmentation
+            num_obj_to_display (int): amount of objects from
+                detected objects to display 
+        """
+        super().__init__(**kwargs)
+        self.num_obj_to_display = num_obj_to_display
+
+    def process_update(self, update_message):
+        for iu, ut in update_message:
+            if ut != retico_core.UpdateType.ADD:
+                continue
+            else:
+                image_objects = {}
+                output_iu = self.create_iu(iu)
+
+                img_dict = iu.get_json()
+                image = iu.image
+
+                obj_type = img_dict['object_type']
+                num_objs = img_dict['num_objects']
+                print(f"Num Objects in Vsison: {num_objs}")
+
+                if (self.num_obj_to_display > num_objs):
+                    print("Number of objects detected less than requested. Showing all objects.")
+                    self.num_obj_to_display = num_objs
+
+                sam_image = np.array(image) #need image to be in numpy.ndarray format for methods
+                 
+                if obj_type == 'bb':
+                    valid_boxes = img_dict['detected_objects']
+                    for i in range(num_objs):
+                        res_image = self.extract_bb_object(sam_image, valid_boxes[i])
+                        image_objects[f'object_{i+1}'] = res_image
+                    output_iu.set_extracted_objects(image, image_objects, num_objs, obj_type)
+                elif obj_type == 'seg':
+                    valid_segs = img_dict['detected_objects']
+                    for i in range(num_objs):
+                        res_image = Image.fromarray(self.extract_seg_object(sam_image, valid_segs[i]))
+                        image_objects[f'object_{i+1}'] = res_image
+                    output_iu.set_extracted_objects(image, image_objects, num_objs, obj_type)
+                else: 
+                    print('Object type is invalid. Can\'t retrieve segmented object.')
+                    exit()
+
+                # print(image_objects)
+
+                num_rows = math.ceil(self.num_obj_to_display / 3)
+                if self.num_obj_to_display < 3:
+                    num_cols = self.num_obj_to_display
+                else:
+                    num_cols = 3
+                fig, axs = plt.subplots(num_rows, num_cols, figsize=(12, 4*num_rows)) #need to adjust to have matching columsn and rows to fit num_obj_to_display
+                axs = axs.ravel() if isinstance(axs, np.ndarray) else [axs]
+
+                for i in range(self.num_obj_to_display):
+                    res_image = image_objects[f'object_{i+1}']
+                    axs[i].imshow(res_image)
+                    axs[i].set_title(f'Object {i+1}')
+                
+                for j in range(self.num_obj_to_display, num_rows * num_cols):
+                    axs[j].axis('off')
+
+                folder_name = "extracted_objects"
+                if not os.path.exists(folder_name):
+                    os.makedirs(folder_name)
+                
+                plt.tight_layout()
+                save_path = os.path.join(folder_name, f'top_{self.num_obj_to_display}_extracted_objs.png')
+                plt.savefig(save_path)
+
+            um = retico_core.UpdateMessage.from_iu(output_iu, retico_core.UpdateType.ADD) 
+            self.append(um)
+
+    def extract_seg_object(self, image, seg):
+        ret_image = image.copy()
+        ret_image[seg==False] = [255, 255, 255]
+        return ret_image
+    
+    def extract_bb_object(self, image, bbox):
+        #return a cut out of the bounding boxed object from the image 
+        # x, y, w, h = bbox
+        # ret_image = image[y:y+h, x:x+w]
+        
+        #uncomment below to keep position of object in image
+        mask = np.zeros_like(image)
+        x, y, w, h = bbox
+
+        cv2.rectangle(mask, (0, 0), (image.shape[1], image.shape[0]), (255, 255, 255), -1)
+        cv2.rectangle(mask, (x, y), (x+w, y+h), (0, 0, 0), -1)
+
+        mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+        _, mask = cv2.threshold(mask, 1, 255, cv2.THRESH_BINARY)
+
+        mask = cv2.bitwise_not(mask)
+        
+        ret_image = cv2.bitwise_and(image, image, mask=mask)
+        ret_image[mask == 0] = [255, 255, 255]
+
+        return ret_image 
+
+        
+
+class ExtractedObjectsIU(retico_core.IncrementalUnit):
+    """A dictionary incremental unit that maintains a dictionary of objects segmented from an Image
+    
+    Attributes:
+        creator (AbstractModule): The module that created this IU
+        previous_iu (IncrementalUnit): A link to the IU created before the c
+            current one
+        grounded_in (IncrementalUnit): A link to the IU this IU is based on
+        created_at (float): The UNIX timestamp of the moment the IU is created
+    """
+
+    @staticmethod
+    def type():
+        return "Extracted Objects IU"
+    
+    def __init__(
+            self,
+            creator=None,
+            iuid=0,
+            previous_iu=None,
+            grounded_in=None,
+            **kwargs
+    ):
+        super().__init__(
+            creator=creator,
+            iuid=iuid,
+            previous_iu=previous_iu,
+            grounded_in=grounded_in,
+            payload=None
+        )
+        self.image = None
+        self.num_objects = 0
+        self.object_type = None
+        self.extracted_objects = {}
+
+    def set_extracted_objects(self, image, objects_dictionary, num_objects, object_type,):
+        """Sets the content for the IU"""
+        self.image = image
+        self.payload = objects_dictionary
+        self.num_objects = num_objects
+        self.object_type = object_type
+        self.extracted_objects = objects_dictionary
+
+    def get_json(self):
+        payload = {}
+        payload['image'] = self.image
+        payload['num_objects'] = self.num_objects
+        payload['object_type'] = self.object_type
+        payload['segmented_objects_dictionary'] = self.extracted_objects
+        return payload
+    
+    def create_from_json(self, json_dict):
+        self.image =  Image.fromarray(np.array(json_dict['image'], dtype='uint8'))
+        self.payload = self.extracted_objects
+        self.num_objects = json_dict['num_objects']
+        self.extracted_objects = json_dict['segmented_objects_dictionary']
+                
 
