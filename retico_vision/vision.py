@@ -361,7 +361,7 @@ class ExtractObjectsModule(retico_core.AbstractModule):
                     for i in range(num_objs):
                         res_image = self.extract_bb_object(sam_image, valid_boxes[i])
                         if self.show:
-                            cv2.imshow('image',cv2.cvtColor(res_image, cv2.COLOR_RGB2BGR)) 
+                            cv2.imshow('image',res_image) 
                             cv2.waitKey(1)
                         image_objects[f'object_{i+1}'] = res_image
                     output_iu.set_extracted_objects(image, image_objects, num_objs, obj_type)
@@ -431,7 +431,7 @@ class ExtractObjectsModule(retico_core.AbstractModule):
 
             ret_image[mask == 0] = [255, 255, 255]
 
-
+        ret_image = cv2.cvtColor(ret_image, cv2.COLOR_RGB2BGR)
         return ret_image 
 
         
