@@ -172,6 +172,7 @@ class ObjectFeaturesIU(retico_core.IncrementalUnit):
 
     def get_json(self):
         payload = {}
+        # print(type(self.object_features))
         payload['image'] = np.array(self.image).tolist()
         payload['object_features'] = self.object_features
         payload['num_objects'] = self.num_objects
@@ -489,8 +490,8 @@ class ExtractedObjectsIU(retico_core.IncrementalUnit):
     
     def create_from_json(self, json_dict):
         self.image =  Image.fromarray(np.array(json_dict['image'], dtype='uint8'))
-        self.payload = self.extracted_objects
         self.num_objects = json_dict['num_objects']
         self.extracted_objects = json_dict['segmented_objects_dictionary']
+        self.payload = self.extracted_objects
                 
 
