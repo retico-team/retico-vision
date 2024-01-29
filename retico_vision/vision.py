@@ -322,7 +322,7 @@ class ExtractObjectsModule(retico_core.AbstractModule):
     def output_iu():
         return ExtractedObjectsIU
 
-    def __init__(self, num_obj_to_display=1, **kwargs):
+    def __init__(self, num_obj_to_display=1, show=False, keepmask=False, **kwargs):
         """
         Initialize the Display Objects Module
         Args:
@@ -333,6 +333,8 @@ class ExtractObjectsModule(retico_core.AbstractModule):
         """
         super().__init__(**kwargs)
         self.num_obj_to_display = num_obj_to_display
+        self.show = show
+        self.keepmask = keepmask
 
     def process_update(self, update_message):
         for iu, ut in update_message:
@@ -354,11 +356,13 @@ class ExtractObjectsModule(retico_core.AbstractModule):
                     self.num_obj_to_display = num_objs
 
                 sam_image = np.array(image) #need image to be in numpy.ndarray format for methods
-                 
                 if obj_type == 'bb':
                     valid_boxes = img_dict['detected_objects']
                     for i in range(num_objs):
                         res_image = self.extract_bb_object(sam_image, valid_boxes[i])
+                        if self.show:
+                            cv2.imshow('image',cv2.cvtColor(res_image, cv2.COLOR_RGB2BGR)) 
+                            cv2.waitKey(1)
                         image_objects[f'object_{i+1}'] = res_image
                     output_iu.set_extracted_objects(image, image_objects, num_objs, obj_type)
                 elif obj_type == 'seg':
@@ -407,23 +411,26 @@ class ExtractObjectsModule(retico_core.AbstractModule):
     
     def extract_bb_object(self, image, bbox):
         #return a cut out of the bounding boxed object from the image 
-        # x, y, w, h = bbox
-        # ret_image = image[y:y+h, x:x+w]
-        
-        #uncomment below to keep position of object in image
-        mask = np.zeros_like(image)
-        x, y, w, h = bbox
+        if not self.keepmask:
+            x, y, w, h = bbox
+            ret_image = image[y:y+h, x:x+w]
+        else:
+            # keep position of object in image
+            mask = np.zeros_like(image)
+            x, y, w, h = bbox
 
-        cv2.rectangle(mask, (0, 0), (image.shape[1], image.shape[0]), (255, 255, 255), -1)
-        cv2.rectangle(mask, (x, y), (x+w, y+h), (0, 0, 0), -1)
+            cv2.rectangle(mask, (0, 0), (image.shape[1], image.shape[0]), (255, 255, 255), -1)
+            cv2.rectangle(mask, (x, y), (x+w, y+h), (0, 0, 0), -1)
 
-        mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
-        _, mask = cv2.threshold(mask, 1, 255, cv2.THRESH_BINARY)
+            mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+            _, mask = cv2.threshold(mask, 1, 255, cv2.THRESH_BINARY)
 
-        mask = cv2.bitwise_not(mask)
-        
-        ret_image = cv2.bitwise_and(image, image, mask=mask)
-        ret_image[mask == 0] = [255, 255, 255]
+            mask = cv2.bitwise_not(mask)
+            
+            ret_image = cv2.bitwise_and(image, image, mask=mask)
+
+            ret_image[mask == 0] = [255, 255, 255]
+
 
         return ret_image 
 
