@@ -414,6 +414,10 @@ class ExtractObjectsModule(retico_core.AbstractModule):
         #return a cut out of the bounding boxed object from the image 
         if not self.keepmask:
             x, y, w, h = bbox
+            x=int(x)
+            y=int(y)
+            w=int(w)
+            h=int(h)
             ret_image = image[y:y+h, x:x+w]
         else:
             # keep position of object in image
