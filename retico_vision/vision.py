@@ -5,9 +5,10 @@ from PIL import Image
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import json
 import math
 import os
-
+import datetime
 import retico_core
 
 
@@ -59,18 +60,26 @@ class ImageIU(retico_core.IncrementalUnit):
         self.nframes = int(nframes)
         self.rate = int(rate)
 
-    def get_json(self):
+    def to_zmq(self, update_type):
+        """
+        returns a formatted string that can be sent across zeromq
+        """
         payload = {}
-        payload['image'] = np.array(self.payload).tolist()
-        payload['nframes'] = self.nframes
-        payload['rate'] = self.rate
+        payload["originatingTime"] = datetime.datetime.now().isoformat() #zmq expected format
+        payload["update_type"] = str(update_type)
+        message = {}
+        message['image'] = np.array(self.payload).tolist()
+        message['nframes'] = self.nframes
+        message['rate'] = self.rate
+        payload["message"] = json.dumps(message)
         return payload
 
-    def create_from_json(self, json_dict):
-        self.image =  Image.fromarray(np.array(json_dict['image'], dtype='uint8'))
+    def from_zmq(self, zmq_data):
+        zmq_data = json.loads(zmq_data['message'])
+        self.image =  Image.fromarray(np.array(zmq_data['image'], dtype='uint8'))
         self.payload = self.image
-        self.nframes = json_dict['nframes']
-        self.rate = json_dict['rate']
+        self.nframes = zmq_data['nframes']
+        self.rate = zmq_data['rate']
 
 class DetectedObjectsIU(retico_core.IncrementalUnit):
     """An image incremental unit that maintains a list of detected objects and their bounding boxes.
@@ -115,19 +124,27 @@ class DetectedObjectsIU(retico_core.IncrementalUnit):
         self.num_objects = len(detected_objects)
         self.object_type = object_type
 
-    def get_json(self):
+    def to_zmq(self, update_type):
+        """
+        returns a formatted string that can be sent across zeromq
+        """
         payload = {}
-        payload['image'] = np.array(self.payload).tolist() #just sets image to be the list of objects 
-        payload['detected_objects'] = self.detected_objects
-        payload['num_objects'] = self.num_objects
-        payload['object_type'] = self.object_type
+        payload["originatingTime"] = datetime.datetime.now().isoformat() #zmq expected format
+        payload["update_type"] = str(update_type)
+        message = {}
+        message['image'] = np.array(self.image).tolist()
+        message['detected_objects'] = self.detected_objects
+        message['num_objects'] = self.num_objects
+        message['object_type'] = self.object_type
+        payload["message"] = json.dumps(message)
         return payload
 
-    def create_from_json(self, json_dict):
-        self.image =  Image.fromarray(np.array(json_dict['image'], dtype='uint8'))
-        self.detected_objects = json_dict['detected_objects']
+    def from_zmq(self, zmq_data):
+        zmq_data = json.loads(zmq_data['message'])
+        self.image =  Image.fromarray(np.array(zmq_data['image'], dtype='uint8'))
+        self.detected_objects = zmq_data['detected_objects']
         self.payload = self.detected_objects
-        self.num_objects = json_dict['num_objects']
+        self.num_objects = zmq_data['num_objects']
 
 class ObjectFeaturesIU(retico_core.IncrementalUnit):
     """An image incremental unit that maintains a list of feature vectors for detected objects in a scene.
@@ -170,19 +187,26 @@ class ObjectFeaturesIU(retico_core.IncrementalUnit):
         self.object_features = object_features
         self.num_objects = len(object_features)
 
-    def get_json(self):
+    def to_zmq(self, update_type):
+        """
+        returns a formatted string that can be sent across zeromq
+        """
         payload = {}
-        # print(type(self.object_features))
-        payload['image'] = np.array(self.image).tolist()
-        payload['object_features'] = self.object_features
-        payload['num_objects'] = self.num_objects
+        payload["originatingTime"] = datetime.datetime.now().isoformat() #zmq expected format
+        payload["update_type"] = str(update_type)
+        message = {}
+        message['image'] = np.array(self.image).tolist()
+        message['object_features'] = self.object_features
+        message['num_objects'] = self.num_objects
+        payload["message"] = json.dumps(message)
         return payload
 
-    def create_from_json(self, json_dict):
-        self.image =  Image.fromarray(np.array(json_dict['image'], dtype='uint8'))
-        self.object_features = json_dict['object_features']
-        self.payload = json_dict['object_features']
-        self.num_objects = json_dict['num_objects']
+    def from_zmq(self, zmq_data):
+        zmq_data = json.loads(zmq_data['message'])
+        self.image =  Image.fromarray(np.array(zmq_data['image'], dtype='uint8'))
+        self.object_features = zmq_data['object_features']
+        self.payload = zmq_data['object_features']
+        self.num_objects = zmq_data['num_objects']
 
 class WebcamModule(retico_core.AbstractProducingModule):
     """A module that produces IUs containing images that are captures by
@@ -345,11 +369,11 @@ class ExtractObjectsModule(retico_core.AbstractModule):
                 image_objects = {}
                 output_iu = self.create_iu(iu)
 
-                img_dict = iu.get_json()
+                # img_dict = iu.payload
                 image = iu.image
 
-                obj_type = img_dict['object_type']
-                num_objs = img_dict['num_objects']
+                obj_type = iu.object_type
+                num_objs = iu.num_objects
                 # print(f"Num Objects in Vsison: {num_objs}")
 
                 if (self.num_obj_to_display > num_objs):
@@ -358,7 +382,7 @@ class ExtractObjectsModule(retico_core.AbstractModule):
 
                 sam_image = np.array(image) #need image to be in numpy.ndarray format for methods
                 if obj_type == 'bb':
-                    valid_boxes = img_dict['detected_objects']
+                    valid_boxes = iu.payload
                     for i in range(num_objs):
                         res_image = self.extract_bb_object(sam_image, valid_boxes[i])
                         if self.show:
@@ -367,7 +391,7 @@ class ExtractObjectsModule(retico_core.AbstractModule):
                         image_objects[f'object_{i+1}'] = res_image
                     output_iu.set_extracted_objects(image, image_objects, num_objs, obj_type)
                 elif obj_type == 'seg':
-                    valid_segs = img_dict['detected_objects']
+                    valid_segs = iu.payload
                     for i in range(num_objs):
                         res_image = Image.fromarray(self.extract_seg_object(sam_image, valid_segs[i]))
                         image_objects[f'object_{i+1}'] = res_image
@@ -484,18 +508,25 @@ class ExtractedObjectsIU(retico_core.IncrementalUnit):
         self.object_type = object_type
         self.extracted_objects = objects_dictionary
 
-    def get_json(self):
+    def to_zmq(self, update_type):
+        """
+        returns a formatted string that can be sent across zeromq
+        """
         payload = {}
-        payload['image'] = self.image
-        payload['num_objects'] = self.num_objects
-        payload['object_type'] = self.object_type
-        payload['segmented_objects_dictionary'] = self.extracted_objects
+        payload["originatingTime"] = datetime.datetime.now().isoformat() #zmq expected format
+        payload["update_type"] = str(update_type)
+        message = {}
+        message['image'] = np.array(self.image).tolist()
+        message['segmented_objects_dictionary'] = self.extracted_objects
+        message['num_objects'] = self.num_objects
+        payload["message"] = json.dumps(message)
         return payload
-    
-    def create_from_json(self, json_dict):
-        self.image =  Image.fromarray(np.array(json_dict['image'], dtype='uint8'))
-        self.num_objects = json_dict['num_objects']
-        self.extracted_objects = json_dict['segmented_objects_dictionary']
+
+    def from_zmq(self, zmq_data):
+        zmq_data = json.loads(zmq_data['message'])
+        self.image =  Image.fromarray(np.array(zmq_data['image'], dtype='uint8'))
+        self.num_objects = zmq_data['num_objects']
+        self.extracted_objects = zmq_data['segmented_objects_dictionary']
         self.payload = self.extracted_objects
                 
 
