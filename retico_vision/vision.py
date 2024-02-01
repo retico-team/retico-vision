@@ -133,7 +133,7 @@ class DetectedObjectsIU(retico_core.IncrementalUnit):
         payload["update_type"] = str(update_type)
         message = {}
         message['image'] = np.array(self.image).tolist()
-        message['detected_objects'] = self.detected_objects
+        message['detected_objects'] = self.detected_objects.tolist()
         message['num_objects'] = self.num_objects
         message['object_type'] = self.object_type
         payload["message"] = json.dumps(message)
@@ -379,21 +379,22 @@ class ExtractObjectsModule(retico_core.AbstractModule):
                 if (self.num_obj_to_display > num_objs):
                     print("Number of objects detected less than requested. Showing all objects.")
                     self.num_obj_to_display = num_objs
-
                 sam_image = np.array(image) #need image to be in numpy.ndarray format for methods
                 if obj_type == 'bb':
                     valid_boxes = iu.payload
                     for i in range(num_objs):
                         res_image = self.extract_bb_object(sam_image, valid_boxes[i])
+                        res_image = Image.fromarray(res_image)
                         if self.show:
-                            cv2.imshow('image',res_image) 
-                            cv2.waitKey(1)
+                            res_image.show()
                         image_objects[f'object_{i+1}'] = res_image
                     output_iu.set_extracted_objects(image, image_objects, num_objs, obj_type)
                 elif obj_type == 'seg':
                     valid_segs = iu.payload
                     for i in range(num_objs):
                         res_image = Image.fromarray(self.extract_seg_object(sam_image, valid_segs[i]))
+                        if self.show:
+                            res_image.show()
                         image_objects[f'object_{i+1}'] = res_image
                     output_iu.set_extracted_objects(image, image_objects, num_objs, obj_type)
                 else: 
@@ -460,7 +461,7 @@ class ExtractObjectsModule(retico_core.AbstractModule):
 
             ret_image[mask == 0] = [255, 255, 255]
 
-        ret_image = cv2.cvtColor(ret_image, cv2.COLOR_RGB2BGR)
+        # ret_image = cv2.cvtColor(ret_image, cv2.COLOR_RGB2BGR)
         return ret_image 
 
         
