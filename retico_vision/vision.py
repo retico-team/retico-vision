@@ -403,29 +403,29 @@ class ExtractObjectsModule(retico_core.AbstractModule):
 
                 # print(image_objects)
 
-                num_rows = math.ceil(self.num_obj_to_display / 3)
-                if self.num_obj_to_display < 3:
-                    num_cols = self.num_obj_to_display
-                else:
-                    num_cols = 3
-                fig, axs = plt.subplots(num_rows, num_cols, figsize=(12, 4*num_rows)) #need to adjust to have matching columsn and rows to fit num_obj_to_display
-                axs = axs.ravel() if isinstance(axs, np.ndarray) else [axs]
+                # num_rows = math.ceil(self.num_obj_to_display / 3)
+                # if self.num_obj_to_display < 3:
+                #     num_cols = self.num_obj_to_display
+                # else:
+                #     num_cols = 3
+                # fig, axs = plt.subplots(num_rows, num_cols, figsize=(12, 4*num_rows)) #need to adjust to have matching columsn and rows to fit num_obj_to_display
+                # axs = axs.ravel() if isinstance(axs, np.ndarray) else [axs]
 
-                for i in range(self.num_obj_to_display):
-                    res_image = image_objects[f'object_{i+1}']
-                    axs[i].imshow(res_image)
-                    axs[i].set_title(f'Object {i+1}')
+                # for i in range(self.num_obj_to_display):
+                #     res_image = image_objects[f'object_{i+1}']
+                #     axs[i].imshow(res_image)
+                #     axs[i].set_title(f'Object {i+1}')
                 
-                for j in range(self.num_obj_to_display, num_rows * num_cols):
-                    axs[j].axis('off')
+                # for j in range(self.num_obj_to_display, num_rows * num_cols):
+                #     axs[j].axis('off')
 
-                folder_name = "extracted_objects"
-                if not os.path.exists(folder_name):
-                    os.makedirs(folder_name)
+                # folder_name = "extracted_objects"
+                # if not os.path.exists(folder_name):
+                #     os.makedirs(folder_name)
                 
-                plt.tight_layout()
-                save_path = os.path.join(folder_name, f'top_{self.num_obj_to_display}_extracted_objs.png')
-                plt.savefig(save_path)
+                # plt.tight_layout()
+                # save_path = os.path.join(folder_name, f'top_{self.num_obj_to_display}_extracted_objs.png')
+                # plt.savefig(save_path)
 
             um = retico_core.UpdateMessage.from_iu(output_iu, retico_core.UpdateType.ADD) 
             self.append(um)
