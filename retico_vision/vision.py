@@ -347,7 +347,7 @@ class ExtractObjectsModule(retico_core.AbstractModule):
     def output_iu():
         return ExtractedObjectsIU
 
-    def __init__(self, num_obj_to_display=1, show=False, keepmask=False, **kwargs):
+    def __init__(self, num_obj_to_display=1, show=False, save=False, keepmask=False, **kwargs):
         """
         Initialize the Display Objects Module
         Args:
@@ -359,9 +359,11 @@ class ExtractObjectsModule(retico_core.AbstractModule):
         super().__init__(**kwargs)
         self.num_obj_to_display = num_obj_to_display
         self.show = show
+        self.save = save
         self.keepmask = keepmask
 
     def process_update(self, update_message):
+        print("Extract Objects process update")
         for iu, ut in update_message:
             if ut != retico_core.UpdateType.ADD:
                 continue
@@ -387,6 +389,8 @@ class ExtractObjectsModule(retico_core.AbstractModule):
                         res_image = Image.fromarray(res_image)
                         if self.show:
                             res_image.show()
+                        if self.save:
+                            res_image.save('extr.jpg')
                         image_objects[f'object_{i+1}'] = res_image
                     output_iu.set_extracted_objects(image, image_objects, num_objs, obj_type)
                 elif obj_type == 'seg':
@@ -395,6 +399,8 @@ class ExtractObjectsModule(retico_core.AbstractModule):
                         res_image = Image.fromarray(self.extract_seg_object(sam_image, valid_segs[i]))
                         if self.show:
                             res_image.show()
+                        if self.save:
+                            res_image.save('extr.jpg')
                         image_objects[f'object_{i+1}'] = res_image
                     output_iu.set_extracted_objects(image, image_objects, num_objs, obj_type)
                 else: 
