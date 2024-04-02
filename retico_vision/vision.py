@@ -209,7 +209,7 @@ class ObjectFeaturesIU(retico_core.IncrementalUnit):
         self.num_objects = zmq_data['num_objects']
 
 class WebcamModule(retico_core.AbstractProducingModule):
-    """A module that produces IUs containing images that are captures by
+    """A module that produces IUs containing images that are captured by
     a web camera."""
 
     @staticmethod
@@ -237,7 +237,7 @@ class WebcamModule(retico_core.AbstractProducingModule):
         self.width = width
         self.height = height
         self.rate = rate
-        self.cap = cv2.VideoCapture(0)
+        self.cap = cv2.VideoCapture(-1)
 
         self.setup()
 
@@ -363,7 +363,7 @@ class ExtractObjectsModule(retico_core.AbstractModule):
         self.keepmask = keepmask
 
     def process_update(self, update_message):
-        print("Extract Objects process update")
+        # print("Extract Objects process update")
         for iu, ut in update_message:
             if ut != retico_core.UpdateType.ADD:
                 continue
@@ -432,7 +432,7 @@ class ExtractObjectsModule(retico_core.AbstractModule):
                 # plt.tight_layout()
                 # save_path = os.path.join(folder_name, f'top_{self.num_obj_to_display}_extracted_objs.png')
                 # plt.savefig(save_path)
-
+            output_iu.payload['num_objects'] = iu.num_objects
             um = retico_core.UpdateMessage.from_iu(output_iu, retico_core.UpdateType.ADD) 
             self.append(um)
 
@@ -536,4 +536,116 @@ class ExtractedObjectsIU(retico_core.IncrementalUnit):
         self.extracted_objects = zmq_data['segmented_objects_dictionary']
         self.payload = self.extracted_objects
                 
+class HandPositionsIU(ObjectFeaturesIU):
+    """An image incremental unit that maintains a list of multi_hand_landmarks (points on hand) and multi_handedness (whether each hand is left or gith).
 
+    Attributes:
+        creator (AbstractModule): The module that created this IU
+        previous_iu (IncrementalUnit): A link to the IU created before the
+            current one.
+        grounded_in (IncrementalUnit): A link to the IU this IU is based on.
+        created_at (float): The UNIX timestamp of the moment the IU is created.
+    """
+    @staticmethod
+    def type():
+        return "Hand Positions IU"
+    
+    def __init__(self, creator=None, iuid=0, previous_iu=None, grounded_in=None,
+                 rate=None, nframes=None, sample_width=None, raw_audio=None,
+                 **kwargs):
+        super().__init__(creator=creator, iuid=iuid, previous_iu=previous_iu,
+                         grounded_in=grounded_in, payload=None)
+        self.multi_hand_landmarks = None
+        self.multi_handedness = None
+        self.image = None
+
+    def set_landmarks(self, image, multi_hand_landmarks, multi_handedness):
+        "Sets landmark content of the IU"
+        self.image = image
+        self.payload = multi_hand_landmarks
+        self.multi_handedness = multi_handedness
+
+    def payload_to_vector(self, count):
+        if self.payload is None: return
+        tempPayload = self.payload
+        self.payload = {}
+        # print(self.payload[0])
+        for hand_index, hand_landmarks in enumerate(tempPayload):
+            # Iterate over the detected landmarks of the hand.
+            vector = []
+            for landmark in hand_landmarks.landmark:
+                vector.append(landmark.x)
+                vector.append(landmark.y)
+                vector.append(landmark.z)
+            if hand_index == 0:
+                self.payload['hand' + str(hand_index)] = np.array(vector)
+            # print(len(vector))
+
+            # print("vector: ", self.payload)
+        # vector = []
+        # if self.payload is None: return
+        # print("size ", len(self.payload))
+        # for landmark in self.payload[0]:
+        #     print(type(landmark))
+        #     print(landmark)
+        #     vector.append(landmark.x)
+        #     vector.append(landmark.y)
+        #     vector.append(landmark.z)
+        #     print(self.payload)
+        # self.payload = np.array(self.payload)
+
+
+    def get_json(self):
+        payload = {}
+        payload['image'] = np.array(self.payload).tolist()
+        payload['multi_hand_landmarks'] = self.multi_hand_landmarks
+        payload['multi_handedness'] = self.multi_handedness
+        return payload
+
+    def create_from_json(self, json_dict):
+        self.image =  Image.fromarray(np.array(json_dict['image'], dtype='uint8'))
+        self.multi_hand_landmarks = json_dict['multi_hand_landmarks']
+        self.payload = self.multi_hand_landmarks
+        self.multi_handedness = json_dict['multi_handedness']
+
+class PosePositionsIU(retico_core.IncrementalUnit):
+    """An image incremental unit that maintains a list of pose_landmarks (points on body) and segmentation_mask (pixel values where 1 represents human pixel and 0 represents background pixel)).
+
+    Attributes:
+        creator (AbstractModule): The module that created this IU
+        previous_iu (IncrementalUnit): A link to the IU created before the
+            current one.
+        grounded_in (IncrementalUnit): A link to the IU this IU is based on.
+        created_at (float): The UNIX timestamp of the moment the IU is created.
+    """
+    @staticmethod
+    def type():
+        return "Pose Positions IU"
+
+    def __init__(self, creator=None, iuid=0, previous_iu=None, grounded_in=None,
+                    rate=None, nframes=None, sample_width=None, raw_audio=None,
+                    **kwargs):
+        super().__init__(creator=creator, iuid=iuid, previous_iu=previous_iu,
+                            grounded_in=grounded_in, payload=None)
+        self.pose_landmarks = None
+        self.segmentation_mask = None
+        self.image = None
+
+    def set_landmarks(self, image, pose_landmarks, segmentation_mask):
+        "Sets landmark content of the IU"
+        self.image = image
+        self.payload = pose_landmarks
+        self.segmentation_mask = segmentation_mask
+
+    def get_json(self):
+        payload = {}
+        payload['image'] = np.array(self.payload).tolist()
+        payload['pose_landmarks'] = self.pose_landmarks
+        payload['segmentation_mask'] = self.segmentation_mask
+        return payload
+
+    def create_from_json(self, json_dict):
+        self.image =  Image.fromarray(np.array(json_dict['image'], dtype='uint8'))
+        self.pose_landmarks = json_dict['pose_landmarks']
+        self.payload = self.pose_landmarks
+        self.segmentation_mask = json_dict['segmentation_mask']
