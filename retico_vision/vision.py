@@ -347,17 +347,17 @@ class ExtractObjectsModule(retico_core.AbstractModule):
     def output_iu():
         return ExtractedObjectsIU
 
-    def __init__(self, max_num_obj_to_display=1, show=False, save=False, keepmask=False, **kwargs):
+    def __init__(self, num_obj_to_display=1, show=False, save=False, keepmask=False, **kwargs):
         """
         Initialize the Display Objects Module
         Args:
             object_type (str): whether object is defined 
                 in bounding box or segmentation
-            max_num_obj_to_display (int): amount of objects from
+            num_obj_to_display (int): amount of objects from
                 detected objects to display 
         """
         super().__init__(**kwargs)
-        self.max_num_obj_to_display = max_num_obj_to_display
+        self.max_num_obj_to_display = num_obj_to_display
         self.show = show
         self.save = save
         self.keepmask = keepmask
