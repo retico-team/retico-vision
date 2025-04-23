@@ -357,7 +357,7 @@ class ExtractObjectsModule(retico_core.AbstractModule):
                 detected objects to display 
         """
         super().__init__(**kwargs)
-        self.num_obj_to_display = num_obj_to_display
+        self.max_num_obj_to_display = num_obj_to_display
         self.show = show
         self.save = save
         self.keepmask = keepmask
@@ -378,9 +378,11 @@ class ExtractObjectsModule(retico_core.AbstractModule):
                 num_objs = iu.num_objects
                 # print(f"Num Objects in Vsison: {num_objs}")
 
-                if (self.num_obj_to_display > num_objs):
-                    print("Number of objects detected less than requested. Showing all objects.")
-                    self.num_obj_to_display = num_objs
+                num_obj_to_display = self.max_num_obj_to_display
+                if num_obj_to_display > num_objs:
+                    num_obj_to_display = num_objs
+                    print(f"Number of objects detected less than requested [{num_objs} detected]. Showing {num_obj_to_display} objects.")
+
                 sam_image = np.array(image) #need image to be in numpy.ndarray format for methods
                 if obj_type == 'bb':
                     valid_boxes = iu.payload
@@ -409,20 +411,20 @@ class ExtractObjectsModule(retico_core.AbstractModule):
 
                 # print(image_objects)
 
-                # num_rows = math.ceil(self.num_obj_to_display / 3)
-                # if self.num_obj_to_display < 3:
-                #     num_cols = self.num_obj_to_display
+                # num_rows = math.ceil(num_obj_to_display / 3)
+                # if num_obj_to_display < 3:
+                #     num_cols = num_obj_to_display
                 # else:
                 #     num_cols = 3
                 # fig, axs = plt.subplots(num_rows, num_cols, figsize=(12, 4*num_rows)) #need to adjust to have matching columsn and rows to fit num_obj_to_display
                 # axs = axs.ravel() if isinstance(axs, np.ndarray) else [axs]
 
-                # for i in range(self.num_obj_to_display):
+                # for i in range(num_obj_to_display):
                 #     res_image = image_objects[f'object_{i+1}']
                 #     axs[i].imshow(res_image)
                 #     axs[i].set_title(f'Object {i+1}')
                 
-                # for j in range(self.num_obj_to_display, num_rows * num_cols):
+                # for j in range(num_obj_to_display, num_rows * num_cols):
                 #     axs[j].axis('off')
 
                 # folder_name = "extracted_objects"
@@ -430,7 +432,7 @@ class ExtractObjectsModule(retico_core.AbstractModule):
                 #     os.makedirs(folder_name)
                 
                 # plt.tight_layout()
-                # save_path = os.path.join(folder_name, f'top_{self.num_obj_to_display}_extracted_objs.png')
+                # save_path = os.path.join(folder_name, f'top_{num_obj_to_display}_extracted_objs.png')
                 # plt.savefig(save_path)
             output_iu.payload['num_objects'] = iu.num_objects
             um = retico_core.UpdateMessage.from_iu(output_iu, retico_core.UpdateType.ADD) 
