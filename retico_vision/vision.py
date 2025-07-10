@@ -1,10 +1,14 @@
 
 import cv2
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw, ImageTk
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import tkinter as tk
+from tkinter import Label
+import threading
+from collections import deque
 import json
 import math
 import os
@@ -649,3 +653,200 @@ class PosePositionsIU(retico_core.IncrementalUnit):
         self.pose_landmarks = json_dict['pose_landmarks']
         self.payload = self.pose_landmarks
         self.segmentation_mask = json_dict['segmentation_mask']
+
+class ScreenModule(retico_core.AbstractConsumingModule):
+    # Class variable to track the root window
+    _tk_root = None
+
+    """
+    A module that displays images on the screen.
+    """
+
+    @staticmethod
+    def name():
+        return "ScreenModule"
+
+    @staticmethod
+    def description():
+        return "A module that displays images on the screen."
+
+    @staticmethod
+    def input_ius():
+        return [ImageIU]
+
+    def __init__(self, fps=30):
+        """
+        Initialize the ScreenModule with a specified frames per second (fps).
+        Note that the fps parameter is an upper limit for the display refresh rate.
+        
+        Args:
+            fps (int): The desired frames per second for the display. Default is 30.
+        """
+        super().__init__()
+        self._running = False
+        self.fps = fps
+        self.queue = deque(maxlen=1)
+        self.display_thread = None
+        self.root = None
+        self.label = None
+        self.is_main_window = False
+
+    def setup(self):
+        """
+        Set up the module.
+        """
+        self._running = True
+        
+        self._init_gui()
+        self._schedule_update()
+        
+    def _init_gui(self):
+        """
+        Initialize the GUI components. Called from main thread on macOS.
+        """
+        try:
+            # Create tkinter window: only one Tk, others are Toplevel
+            if ScreenModule._tk_root is None:
+                self.root = tk.Tk()
+                ScreenModule._tk_root = self.root
+                self.is_main_window = True
+            else:
+                self.root = tk.Toplevel(ScreenModule._tk_root)
+                self.is_main_window = False
+            
+            self.root.title("Screen Module")
+            
+            # Create label to hold the image
+            self.label = Label(self.root)
+            self.label.pack(expand=True, fill='both')
+            
+        except Exception as e:
+            print(f"Error initializing GUI: {e}")
+
+    def _schedule_update(self):
+        """
+        Schedule the next update. Used on macOS to avoid threading issues.
+        """
+        if self._running and self.root and self.root.winfo_exists():
+            self._update_display()
+            # Schedule next update
+            self.root.after(int(1000 / self.fps), self._schedule_update)
+
+    def shutdown(self):
+        """
+        Clean up the module, e.g., close display windows.
+        """
+        self._running = False
+        
+        # Close tkinter window if it exists
+        if self.root:
+            self.root.quit()
+            
+
+    def _update_display(self):
+        """
+        Update the display with new images from the queue.
+        """
+        try:
+            # Check if root and label exist and window is not destroyed
+            if not (self._running and self.root and self.label and self.root.winfo_exists()):
+                return
+
+            if len(self.queue) > 0:
+                image = self.queue.popleft()
+                if image is not None:
+                    # Resize image if necessary
+                    if hasattr(image, 'size'):
+                        pil_image = image
+                    else:
+                        pil_image = Image.fromarray(image)
+
+                    # Convert to tkinter PhotoImage
+                    photo = ImageTk.PhotoImage(pil_image)
+
+                    # Update the label with new image
+                    self.label.configure(image=photo)
+                    self.label.image = photo  # Keep a reference
+
+        except Exception as e:
+            print(f"Error updating display: {e}")
+            # If the error is due to a missing image or destroyed widget, stop updating
+            if not (self.root and self.root.winfo_exists()):
+                return
+
+    def process_update(self, update_message):
+        for iu, um in update_message:
+            if isinstance(iu, ImageIU):
+                image = iu.image
+                if self._running and image is not None:
+                    # Queue the image for display
+                    self.queue.append(image)
+
+class Convert_DetectedObjectsIU_ImageIU(retico_core.AbstractModule):
+    """
+    A module that converts DetectedObjectsIU to ImageIU for display.
+    """
+    @staticmethod
+    def name():
+        return "Convert_DetectedObjectsIU_ImageIU"
+
+    @staticmethod
+    def description():
+        return "Converts DetectedObjectsIU to ImageIU for display."
+
+    @staticmethod
+    def input_ius():
+        return [DetectedObjectsIU]
+
+    @staticmethod
+    def output_iu():
+        return ImageIU
+
+    def __init__(self, num_obj_to_display=1):
+        super().__init__()
+        self.num_obj_to_display = num_obj_to_display
+
+    def process_update(self, update_message):
+        for iu, ut in update_message:
+            if ut != retico_core.UpdateType.ADD:
+                continue
+            elif isinstance(iu, DetectedObjectsIU):
+                # Convert DetectedObjectsIU to ImageIU and draw bounding boxes
+                image : Image = iu.image
+
+                output_iu = self.create_iu(iu)
+
+                obj_type = iu.object_type
+                num_objs = min(self.num_obj_to_display, iu.num_objects)
+
+                if obj_type == 'bb':
+                    valid_boxes = iu.payload
+                    for i in range(num_objs):
+                        box = valid_boxes[i]
+                        if box is not None:
+                            x1, y1, x2, y2 = box
+                            # Draw bounding box on the image
+                            img_draw = ImageDraw.Draw(image)
+                            img_draw.rectangle([x1, y1, x2, y2], outline='red', width=2)
+                            # put a label on the box
+                            img_draw.text((x1, y1), f'Object {i+1}', fill='red')
+                elif obj_type == 'seg':
+                    valid_segs = iu.payload
+                    for i in range(num_objs):
+                        seg_mask = valid_segs[i]
+                        # seg_mask is expected to be a binary mask
+                        if seg_mask is not None:
+                            # Convert the mask to a PIL Image and apply it to the original with transparency
+                            seg_mask_image = Image.fromarray(seg_mask.astype('uint8') * 255)
+                            # blend the mask with the original image
+                            image = Image.composite(image, Image.new('RGB', image.size, (255, 0, 0)), seg_mask_image)
+                            # put a label on the image
+                            img_draw = ImageDraw.Draw(image)
+                            img_draw.text((10, 10 + i * 20), f'Segmented Object {i+1}', fill='red')
+                else: 
+                    print('Object type is invalid. Can\'t retrieve segmented object.')
+                    exit()
+
+                output_iu.image = image
+                um = retico_core.UpdateMessage.from_iu(output_iu, retico_core.UpdateType.ADD) 
+                self.append(um)
