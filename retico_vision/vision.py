@@ -243,7 +243,7 @@ class WebcamModule(retico_core.AbstractProducingModule):
         self.width = width
         self.height = height
         self.rate = rate
-        self.cap = cv2.VideoCapture(-1)
+        self.cap = cv2.VideoCapture(0)
 
         self.setup()
 
