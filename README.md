@@ -1,7 +1,12 @@
-# retico-clip
+# retico-vision
 A ReTiCo module with base modules and incremental units for computer vision.
 
 ### Installation and requirements
+
+Requires [retico-core](https://github.com/retico-team/retico-core).
+
+Install the retico-vision package:  
+```pip install git+https://github.com/retico-team/retico-vision.git```
 
 ### Example
 ```python
