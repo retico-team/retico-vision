@@ -3,6 +3,12 @@ A ReTiCo module with base modules and incremental units for computer vision.
 
 ### Installation and requirements
 
+Requires [retico-core](https://github.com/retico-team/retico-core).  
+```pip install git+https://github.com/retico-team/retico-core.git```
+
+Install the retico-vision package:  
+```pip install git+https://github.com/retico-team/retico-vision.git```
+
 ### Example
 ```python
 import sys, os

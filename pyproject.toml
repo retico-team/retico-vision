@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=80", "setuptools-scm[simple]>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "retico-vision"
+dynamic = ["version"]
+dependencies = [
+    "matplotlib",
+    "numpy",
+    "opencv-python",
+    "pillow",
+    # "retico-core",
+]
+authors = [
+    {name = "Casey Kennington"},
+    {name = "Davide Cavicchini"},
+    {name = "Drew McMains"},
+    {name = "Mario Barbato"},
+    {name = "Ryan Whetten"},
+]
+description = "Vision module and IU's for retico."
+readme = "README.md"
+license = { file = "LICENSE" }
+keywords = ["real-time", "computer vision"]
+
