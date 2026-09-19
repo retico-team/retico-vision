@@ -10,7 +10,7 @@ dependencies = [
     "numpy",
     "opencv-python",
     "pillow",
-    # "retico-core",
+    "retico-core",
 ]
 authors = [
     {name = "Casey Kennington"},
