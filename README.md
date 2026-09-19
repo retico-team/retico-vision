@@ -1,12 +1,12 @@
-# retico-clip
+# retico-vision
 A ReTiCo module with base modules and incremental units for computer vision.
 
 ### Installation and requirements
 
-Requires [retico-core](https://github.com/retico-team/retico-core).  
-```pip install git+https://github.com/retico-team/retico-core.git```
+Install the retico-vision package:
+```pip install retico-vision```
 
-Install the retico-vision package:  
+Alternatively, install directly from the GitHub repository:
 ```pip install git+https://github.com/retico-team/retico-vision.git```
 
 ### Example
@@ -16,8 +16,6 @@ import sys, os
 os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
 
 prefix = '/path/to/prefix'
-sys.path.append(prefix+'retico-core')
-sys.path.append(prefix+'retico-vision')
 sys.path.append(prefix+'retico-sam')
 sys.path.append(prefix+'retico-dino')
 
